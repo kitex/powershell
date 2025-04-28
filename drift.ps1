@@ -35,17 +35,23 @@ while ($accept -inotmatch "yes" -or $accept -inotmatch "y") {
 
 $configName = ".\config\{0}.json" -f $apps.PSObject.Properties[$appNum].Value
 
+$csvPath = ".\output.csv"
+
+# Check if file exists
+if (Test-Path $csvPath) {    
+    Write-Host "File $csvPath already exists. Do you want to overwrite it? (yes/no)"
+    $overwrite = Read-Host
+    if ($overwrite -imatch "yes" -and $overwrite -imatch "y") {
+        Remove-Item $csvPath -Force        
+        Write-Host "Deleted $csvPath..."
+    }
+}
+
+
 try {
     $config = fileToJson $configName "Stop"    
+   
     
-    try {
-        Write-Host "Validating configuration..."
-        checkConfigIsValid $config   
-    }
-    catch {
-        Write-Host "Invalid configuration: $_"
-        Exit 1
-    }
     
     foreach ($configItem in $config.PSObject.Properties) {
         if ($configItem.Value.enabled) {

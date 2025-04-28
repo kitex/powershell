@@ -66,6 +66,7 @@ function checkConfigIsValid($config) {
     $prodPaths = $config.prod_dir -split ";"
     $bcpPaths = $config.bcp_dir -split ";"
 
+    Write-Host "$prodPaths vs $bcpPaths"
     if ($prodPaths.Length -ne $bcpPaths.Length) {
         throw "Number of prod paths and bcp paths do not match."
     }
@@ -74,18 +75,46 @@ function checkConfigIsValid($config) {
         throw "At least one prod and one bcp server must be specified."
     }
 }
+
+function addToCSV($row, $csvPath) {
+    # Check if file exists
+    if (Test-Path $csvPath) {
+        # File exists, just append
+        $row | Export-Csv -Path $csvPath -Append -NoTypeInformation
+    }
+    else {
+        # File doesn't exist, create new with headers
+        $row | Export-Csv -Path $csvPath -NoTypeInformation
+    }
+}
    
 
 
 function comparePath($config) {
+
+
     Write-Host "Cleaning all SSH Sessions..."
     closeAllSessions
     Write-Host "All SSH sessions closed."
+
+
     # Read source and destination hosts and paths to be compared
     $prodServers = $config.prod_servers -split ";"
     $bcpServers = $config.bcp_servers -split ";"
     $prodPaths = $config.prod_dir -split ";"
     $bcpPaths = $config.bcp_dir -split ";"
+    $csvPath = "./output.csv"
+
+    #check if config is good for selected option
+    try {
+        Write-Host "Validating configuration... $config"
+        checkConfigIsValid $config   
+    }
+    catch {
+        Write-Host "Invalid configuration: $_"
+        Exit 1
+    }
+
     
     $adent = Read-Host -Prompt "Enter your AD-ENT ID"
     $tokenPin = readPassWord
@@ -98,7 +127,7 @@ function comparePath($config) {
     $referenceSession = $null
     $referenceServer = $prodServers[0]
 
-    # get session for bcp servers
+    #get reference server session and all prod sessions
     if ($prodServers.Length -gt 1) {
         $referenceSession = createSSHSession $adent $tokenPin $referenceServer
         $prodSessions = createSSHSessions $adent $tokenPin $prodServers[1..($prodServers.Length - 1)]
@@ -125,14 +154,22 @@ function comparePath($config) {
             Write-Host "Got checksum for reference server $($referenceCheckSum.Output[0]) $($referenceServer)"
         }
         catch {
-            Write-Host "Error executing $($referenceCommand) for reference server $($referenceServer) $($prodPath)"
-            Write-Host "Error: $($_.Exception.Message)"
+            Write-Host "Error executing $referenceCommand for reference server $($referenceServer) $($prodPath).Check path and server name"
+            Write-Host "Error: $($_.Exception.Message)"   
+            $row = [PSCustomObject]@{
+                ReferenceServer = $referenceServer
+                CheckedServer   = $referenceServer
+                Result          = "Not Ok"
+                Remarks         = "Error Checking checksum for reference server $($referenceServer) $($prodPath). Check path and server name"
+            }
+            addToCSV $row $csvPath         
             i++
             continue
         }
         
         if ($prodServers.Length -gt 1) { 
             foreach ($prodSession in $prodSessions) {
+                $row = $null
                 try {
                     Write-Host "Getting checksum for Prod $($prodSession.Item2) $($prodPaths[$i])"      
                     $command = IdentifyCommandToCompareHash $($prodPaths[$i]) $prodSession.Item1.SessionId
@@ -143,10 +180,17 @@ function comparePath($config) {
                 catch {
                     Write-Host "Error executing for Prod $($prodSession.Item2) $($prodPaths[$i]) vs $($referenceServer) $($prodPath)"
                     Write-Host "Error: $($_.Exception.Message)"
+                    $row = [PSCustomObject]@{
+                        ReferenceServer = $referenceServer
+                        CheckedServer   = $prodSession.Item2
+                        Result          = "Not Ok"
+                        Remarks         = "Checksum not equal for Prod $($prodSession.Item2) $($prodPaths[$i]) vs $($referenceServer) $($prodPath)"
+                    }
+                    addToCSV $row $csvPath
                     continue
                 }
                
-                $row = $null
+               
                 if ($checksumProd.Output[0] -eq $referenceCheckSum.Output[0]) {
                     Write-Host "Checksum equal for Prod $($prodSession.Item2) $($prodPaths[$i]) vs $($referenceServer) $($prodPath)"
                     $row = [PSCustomObject]@{
@@ -165,22 +209,15 @@ function comparePath($config) {
                         Remarks         = "Checksum not equal for Prod $($prodSession.Item2) $($prodPaths[$i]) vs $($referenceServer) $($prodPath)"
                     }
                 }
-                $csvPath = "./output.csv"
-
-                # Check if file exists
-                if (Test-Path $csvPath) {
-                    # File exists, just append
-                    $row | Export-Csv -Path $csvPath -Append -NoTypeInformation
-                }
-                else {
-                    # File doesn't exist, create new with headers
-                    $row | Export-Csv -Path $csvPath -NoTypeInformation
-                }
+                
+                addToCSV $row $csvPath
                 Write-Host "---------------Prod Check complete------------------------------------"
             }
         }
 
         foreach ($bcpSession in $bcpSessions) {
+            $row = $null
+            $checksumBCP = $null
             try {
                 $command = IdentifyCommandToCompareHash $bcpPath $bcpSessions.Item1.SessionId
                 Write-Host "Command to be executed: $($command) at $($bcpSession.Item2)"
@@ -190,15 +227,37 @@ function comparePath($config) {
             catch {
                 Write-Host "Error executing for BCP $($bcpSession.Item2) $($bcpPaths[$i]) vs $($referenceServer) $($prodPath)"
                 Write-Host "Error: $($_.Exception.Message)"
+                $row = [PSCustomObject]@{
+                    ReferenceServer = $referenceServer
+                    CheckedServer   = $bcpSession.Item2
+                    Result          = "Not Ok"
+                    Remarks         = "Error executing for BCP $($bcpSession.Item2) $($bcpPaths[$i]) vs $($referenceServer) $($prodPath)"
+                }
+                addToCSV $row $csvPath
                 continue
             }
-           
+            
             if ($checksumBCP.Output[0] -eq $referenceCheckSum.Output[0]) {
                 Write-Host "Checksum equal for BCP $($bcpSession.Item2) $($bcpPaths[$i]) vs $($referenceServer) $($prodPath)"
+                $row = [PSCustomObject]@{
+                    ReferenceServer = $referenceServer
+                    CheckedServer   = $bcpSession.Item2
+                    Result          = "Ok"
+                    Remarks         = "Checksum equal for BCP $($bcpSession.Item2) $($bcpPaths[$i]) vs $($referenceServer) $($prodPath)"
+                }
             }
             else {
                 Write-Host "Checksum not equal for BCP $($bcpSession.Item2) $($bcpPaths[$i]) vs $($referenceServer) $($prodPath)"
+                $row = [PSCustomObject]@{
+                    ReferenceServer = $referenceServer
+                    CheckedServer   = $bcpSession.Item2
+                    Result          = "Not Ok"
+                    Remarks         = "Checksum not equal for BCP $($bcpSession.Item2) $($bcpPaths[$i]) vs $($referenceServer) $($prodPath)"
+                }
             }
+            # Check if file exists
+            addToCSV $row $csvPath
+
             Write-Host "-----------------BCP Check Complete----------------------------------"
         }
         $i++
