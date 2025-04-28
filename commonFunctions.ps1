@@ -61,12 +61,10 @@ function IdentifyCommandToCompareHash($path, $sessionId) {
 
 #check edge cases for config file
 function checkConfigIsValid($config) {
-    $prodServers = $config.prod_servers -split ";"
-    $bcpServers = $config.bcp_servers -split ";"
+    $prodServers = ($config.prod_servers -split ";" | Where-Object { $_ -ne "" })
+    $bcpServers =  ($config.bcp_servers -split ";" | Where-Object { $_ -ne "" })
     $prodPaths = $config.prod_dir -split ";"
     $bcpPaths = $config.bcp_dir -split ";"
-
-    Write-Host "$prodPaths vs $bcpPaths"
     if ($prodPaths.Length -ne $bcpPaths.Length) {
         throw "Number of prod paths and bcp paths do not match."
     }
@@ -107,7 +105,7 @@ function comparePath($config) {
 
     #check if config is good for selected option
     try {
-        Write-Host "Validating configuration... $config"
+        Write-Host "Validating configuration..."
         checkConfigIsValid $config   
     }
     catch {

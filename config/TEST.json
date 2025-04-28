@@ -5,7 +5,7 @@
         "prod_dir": "/home/sugandha/check101;/home/sugandha/check102;/home/sugandha/check103",
         "bcp_dir": "/home/sugandha/check101;/home/sugandha/testbcp.txt;/home/sugandha/check103",
         "prod_servers": "192.168.0.17;192.168.0.24",
-        "bcp_servers": "192.168.0.25;192.168.0.26;192.168.0.27",
+        "bcp_servers": "192.168.0.25;192.168.0.26",
         "su_user": "sugandha",
         "enabled": true
     },
