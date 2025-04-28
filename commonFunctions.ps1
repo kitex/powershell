@@ -38,7 +38,6 @@ function closeAllSessions() {
     Get-SSHSession | Remove-SSHSession | Out-Null
 }
 
-
 function IdentifyCommandToCompareHash($path, $sessionId) {
     $typeCommand = "stat --format '%F' $path"
     $pathType = invokeSSHCommand $typeCommand $sessionId
@@ -58,12 +57,10 @@ function IdentifyCommandToCompareHash($path, $sessionId) {
     }
 }
 
-
 #check edge cases for config file
 function checkConfigIsValid($config) {
-    $prodServers = ($config.prod_servers -split ";" | Where-Object { $_ -ne "" })
-    $bcpServers =  ($config.bcp_servers -split ";" | Where-Object { $_ -ne "" })
-    $prodPaths = $config.prod_dir -split ";"
+    $prodServers = ($config.prod_servers -split ";" | Where-Object { $_ -ne "" }) #remove empty strings from the array
+    $bcpServers =  ($config.bcp_servers -split ";" | Where-Object { $_ -ne "" }) #remove empty strings from the array
     $bcpPaths = $config.bcp_dir -split ";"
     if ($prodPaths.Length -ne $bcpPaths.Length) {
         throw "Number of prod paths and bcp paths do not match."
@@ -86,15 +83,11 @@ function addToCSV($row, $csvPath) {
     }
 }
    
-
-
 function comparePath($config) {
-
 
     Write-Host "Cleaning all SSH Sessions..."
     closeAllSessions
     Write-Host "All SSH sessions closed."
-
 
     # Read source and destination hosts and paths to be compared
     $prodServers = $config.prod_servers -split ";"
@@ -112,14 +105,11 @@ function comparePath($config) {
         Write-Host "Invalid configuration: $_"
         Exit 1
     }
-
     
     $adent = Read-Host -Prompt "Enter your AD-ENT ID"
     $tokenPin = readPassWord
     Write-Host "Note: Please enter only token from RSA SecurID."
     Start-Sleep -Seconds 3
-    $checksumResults = @()
-
 
     $prodSessions = $null
     $referenceSession = $null
