@@ -45,11 +45,11 @@ function IdentifyCommandToCompareHash($path, $sessionId) {
 
     if (($pathType.Output[0]) -eq "directory") {
         #if path type is directory
-        return "find $path -type f -exec sha256sum {} + | sort | sha256sum | cut -d ' ' -f1"
+        return "find $path -type f -print0 | xargs -0 sha256sum | sort | awk 'BEGIN{OFS=`",`"} {`$1=`$1; print `$1,`$2}'"
     }
     elseif (($pathType.Output[0] -eq "regular file") -or ($pathType.Output[0] -eq "regular empty file")) {
         #if path type is file
-        return "sha256sum $path | cut -d ' ' -f1"
+        return "sha256sum $path | awk 'BEGIN{OFS=`",`"} {`$1=`$1; print `$1,`$2}'"
     }
     else {
         Write-Host "Please check path as file type is not valid. (IdentifyCommandToCompareHash)"
@@ -139,11 +139,12 @@ function comparePath($config) {
             $referenceCommand = IdentifyCommandToCompareHash $prodPath $referenceSession.SessionId
             Write-Host "Getting checksum for reference server $($referenceServer) $($prodPaths[$i])  using $referenceCommand "
             $referenceCheckSum = Invoke-SSHCommand -Session $referenceSession.SessionId -Command $referenceCommand            
-            Write-Host "Got checksum for reference server $($referenceCheckSum.Output[0]) $($referenceServer)"
+            Write-Host "Got checksum for reference server $($referenceServer) with value $($referenceCheckSum.Output) "
+            addToCSV $row.Output[0] './ref.csv'    
         }
         catch {
             Write-Host "Error executing $referenceCommand for reference server $($referenceServer) $($prodPath).Check path and server name"
-            Write-Host "Error: $($_.Exception.Message)"   
+            Write-Host "Error: $($_.Exception.Message) "   
             $row = [PSCustomObject]@{
                 ReferenceServer = $referenceServer
                 CheckedServer   = $referenceServer
@@ -164,6 +165,7 @@ function comparePath($config) {
                     Write-Host "Command to be executed: $command at $($prodSession.Item2)"
                     $checksumProd = Invoke-SSHCommand -SessionId $prodSession.Item1.SessionId -Command $command
                     Write-Host "Command executed: $command at $($prodSession.Item2)"
+                    addToCSV  $checksumProd.Output'./prod.csv'   
                 }
                 catch {
                     Write-Host "Error executing for Prod $($prodSession.Item2) $($prodPaths[$i]) vs $($referenceServer) $($prodPath)"
@@ -178,7 +180,7 @@ function comparePath($config) {
                     continue
                 }
                
-               
+               <#
                 if ($checksumProd.Output[0] -eq $referenceCheckSum.Output[0]) {
                     Write-Host "Checksum equal for Prod $($prodSession.Item2) $($prodPaths[$i]) vs $($referenceServer) $($prodPath)"
                     $row = [PSCustomObject]@{
@@ -197,7 +199,7 @@ function comparePath($config) {
                         Remarks         = "Checksum not equal for Prod $($prodSession.Item2) $($prodPaths[$i]) vs $($referenceServer) $($prodPath)"
                     }
                 }
-                
+                #>
                 addToCSV $row $csvPath
                 Write-Host "---------------Prod Check complete------------------------------------"
             }
@@ -211,6 +213,7 @@ function comparePath($config) {
                 Write-Host "Command to be executed: $($command) at $($bcpSession.Item2)"
                 $checksumBCP = Invoke-SSHCommand -SessionId $bcpSession.Item1.SessionId -Command $command
                 Write-Host "Command executed: $($command) at $($bcpSession.Item2)"
+                addToCSV $checksumBCP.Output'./bcp.csv'   
             }
             catch {
                 Write-Host "Error executing for BCP $($bcpSession.Item2) $($bcpPaths[$i]) vs $($referenceServer) $($prodPath)"
@@ -224,7 +227,7 @@ function comparePath($config) {
                 addToCSV $row $csvPath
                 continue
             }
-            
+            <#
             if ($checksumBCP.Output[0] -eq $referenceCheckSum.Output[0]) {
                 Write-Host "Checksum equal for BCP $($bcpSession.Item2) $($bcpPaths[$i]) vs $($referenceServer) $($prodPath)"
                 $row = [PSCustomObject]@{
@@ -243,6 +246,7 @@ function comparePath($config) {
                     Remarks         = "Checksum not equal for BCP $($bcpSession.Item2) $($bcpPaths[$i]) vs $($referenceServer) $($prodPath)"
                 }
             }
+                #>
             # Check if file exists
             addToCSV $row $csvPath
 

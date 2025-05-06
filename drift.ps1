@@ -39,10 +39,13 @@ $csvPath = ".\output.csv"
 
 # Check if file exists
 if (Test-Path $csvPath) {    
-    Write-Host "File $csvPath already exists. Do you want to overwrite it? (yes/no)"
+    Write-Host "File $csvPath ref.csv prod.csv and bcp.csv already exists. Do you want to overwrite it? (yes/no)"
     $overwrite = Read-Host
     if ($overwrite -imatch "yes" -and $overwrite -imatch "y") {
-        Remove-Item $csvPath -Force        
+        Remove-Item $csvPath -Force  
+        Remove-Item './ref.csv' -Force    
+        Remove-Item './prod.csv' -Force   
+        Remove-Item './bcp.csv' -Force
         Write-Host "Deleted $csvPath..."
     }
 }
@@ -50,8 +53,6 @@ if (Test-Path $csvPath) {
 
 try {
     $config = fileToJson $configName "Stop"    
-   
-    
     
     foreach ($configItem in $config.PSObject.Properties) {
         if ($configItem.Value.enabled) {
@@ -64,6 +65,8 @@ try {
 }
 catch {
     getWrite-Error "Failed to load configuration: $_"
-    Exit 1}
+    Write-Host "Error: $_"
+    Exit 1
+}
 
 

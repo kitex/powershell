@@ -1,4 +1,2 @@
 "ReferenceServer","CheckedServer","Result","Remarks"
-"192.168.0.17","192.168.0.25","Ok","Checksum equal for BCP 192.168.0.25 /home/sugandha/check101 vs 192.168.0.17 /home/sugandha/check101"
-"192.168.0.17","192.168.0.25","Not Ok","Error executing for BCP 192.168.0.25 /home/sugandha/testbcp.txt vs 192.168.0.17 /home/sugandha/check102"
-"192.168.0.17","192.168.0.17","Not Ok","Error Checking checksum for reference server 192.168.0.17 /home/sugandha/check103. Check path and server name"
+"192.168.0.17","192.168.0.17","Not Ok","Error Checking checksum for reference server 192.168.0.17 /home/sugandha/check101. Check path and server name"
